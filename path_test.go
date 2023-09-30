@@ -1,10 +1,3 @@
-# initial
-
-依赖注入初始化
-
-### 使用
-
-```golang
 package initial_test
 
 import (
@@ -49,13 +42,3 @@ func TestPath(t *testing.T) {
 	result := initial.Default(&Path{})
 	fmt.Printf("result: %v\n", result)
 }
-```
-
-#### 控制台
-
-```
-p: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 
-0}}
-parent: &{resource views public posts.db users.db .log index.html .version 0xc00014a2c0 { false 0 0}}
-result: &{resource views public posts.db users.db .log index.html .version 0xc00014a2c0 {t1 true 3.14 114}}
-```
