@@ -16,6 +16,44 @@ var (
 	ErrTagType = errors.New("tag default's type didn't match")
 )
 
+type fn struct {
+	fn   reflect.Value
+	args []string
+}
+
+var functions map[string]fn
+
+func Register(name string, f any, args ...string) {
+	functions[name] = fn{reflect.ValueOf(f), args}
+}
+
+func call(name string, self, parent reflect.Value) bool {
+	if v, ok := functions[name]; ok {
+		if v.fn.IsZero() {
+			return false
+		}
+		var in []reflect.Value
+		for _, arg := range v.args {
+			switch arg {
+			case "self":
+				in = append(in, self)
+			case "parent":
+				in = append(in, parent)
+			}
+		}
+		v.fn.Call(in)
+		return true
+	}
+	return false
+}
+
+func init() {
+	functions = make(map[string]fn)
+	Register("-", func() {})
+	Register("initial.Abs", abs, "self", "parent")
+	Register("initial.Default", default_, "self")
+}
+
 func Default[P any, T *P](v T) T {
 	return default_(v).(T)
 }
@@ -77,13 +115,7 @@ func default_(v any) any {
 			field.SetInt(j)
 		case reflect.Struct:
 			for _, t := range strings.Split(tag, ";") {
-				switch t {
-				case "-":
-				case "Default":
-					reflect.ValueOf(default_).Call([]reflect.Value{field.Addr()})
-				case "Abs":
-					reflect.ValueOf(abs).Call([]reflect.Value{field.Addr(), vv.Addr()})
-				default:
+				if !call(t, field.Addr(), vv.Addr()) {
 					fn := field.Addr().MethodByName(t)
 					if !fn.IsValid() {
 						panic(ErrMethod)

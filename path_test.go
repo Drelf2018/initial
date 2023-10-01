@@ -16,14 +16,14 @@ type Path struct {
 	Log     string `default:".log" abs:"Root"`
 	Index   string `default:"index.html" abs:"Views"`
 	Version string `default:".version" abs:"Views"`
-	Full    *Path  `default:"Init;Abs;Self;Parent"`
+	Full    *Path  `default:"Init;new;initial.Abs;Self;Parent"`
 
 	Test struct {
 		T1 string  `default:"t1"`
 		T2 bool    `default:"true"`
 		T3 float64 `default:"3.14"`
 		T4 int64   `default:"114"`
-	} `default:"Default"`
+	} `default:"initial.Default"`
 }
 
 func (p *Path) Init(_ any) {
@@ -36,6 +36,14 @@ func (p *Path) Self(_ *Path) {
 
 func (*Path) Parent(parent *Path) {
 	fmt.Printf("parent: %v\n", parent)
+}
+
+func NewPath(self *Path) {
+	fmt.Printf("self: %v\n", self)
+}
+
+func init() {
+	initial.Register("new", NewPath, "self")
 }
 
 func TestPath(t *testing.T) {
