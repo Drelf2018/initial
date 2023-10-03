@@ -86,7 +86,10 @@ func default_(v any) any {
 			field = field.Elem()
 		}
 		// check field
-		if !field.CanSet() || !field.IsZero() {
+		if !field.CanSet() {
+			continue
+		}
+		if !field.IsZero() && field.Kind() != reflect.Struct {
 			continue
 		}
 		// parse tag
