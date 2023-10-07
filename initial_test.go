@@ -7,6 +7,20 @@ import (
 	"github.com/Drelf2018/initial"
 )
 
+type File struct {
+	Name string
+}
+
+func (f *File) Info(*Path) {
+	fmt.Println(f.Name)
+}
+
+type Files []File
+
+func (f *Files) Add(p *Path) {
+	*f = append(*f, File{p.Full.Posts}, File{p.Full.Index})
+}
+
 type Path struct {
 	Root    string `default:"resource"`
 	Views   string `default:"views" abs:"Root"`
@@ -24,6 +38,8 @@ type Path struct {
 		T3 float64 `default:"3.14"`
 		T4 int64   `default:"114"`
 	} `default:"initial.Default"`
+
+	Files Files `default:"Add;range.Info"`
 }
 
 func (p *Path) Init(_ any) {
@@ -32,6 +48,7 @@ func (p *Path) Init(_ any) {
 
 func (p *Path) Self(_ *Path) {
 	fmt.Printf("p: %v\n", p)
+
 }
 
 func (*Path) Parent(parent *Path) {

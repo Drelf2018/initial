@@ -6,14 +6,17 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/Drelf2018/initial/graph"
 )
 
 var (
-	ErrMethod  = errors.New("tag method name not found")
-	ErrPtrNil  = errors.New("pointer parament is nil")
-	ErrTypeStr = errors.New("value v must be a pointer to a struct")
-	ErrTagAbs  = errors.New("tag abs must be a field name")
-	ErrTagType = errors.New("tag default's type didn't match")
+	ErrMethod   = errors.New("tag method name not found")
+	ErrPtrNil   = errors.New("pointer parament is nil")
+	ErrTypeStr  = errors.New("value v must be a pointer to a struct")
+	ErrTagAbs   = errors.New("tag abs must be a field name")
+	ErrTagType  = errors.New("tag default's type didn't match")
+	ErrTagRange = errors.New("can't range value v")
 )
 
 type fn struct {
@@ -89,7 +92,41 @@ func default_(v any) any {
 		if !field.CanSet() {
 			continue
 		}
-		if !field.IsZero() && field.Kind() != reflect.Struct {
+		// func
+		switch field.Kind() {
+		case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
+			findMethod := func(field reflect.Value, name string) {
+				fn := field.Addr().MethodByName(name)
+				if !fn.IsValid() {
+					panic(ErrMethod)
+				}
+				fn.Call([]reflect.Value{vv.Addr()})
+			}
+			for _, method := range strings.Split(tag, ";") {
+				if method == "" || call(method, field.Addr(), vv.Addr()) {
+					continue
+				}
+				var prefix, name string
+				s := strings.Split(method, ".")
+				if len(s) == 1 {
+					name = s[0]
+				} else {
+					prefix, name = s[0], s[1]
+				}
+				if prefix == "range" {
+					if field.Kind() != reflect.Array && field.Kind() != reflect.Slice {
+						panic(ErrTagRange)
+					}
+					for j, len := 0, field.Len(); j < len; j++ {
+						findMethod(field.Index(j), name)
+					}
+				} else {
+					findMethod(field, name)
+				}
+			}
+			continue
+		}
+		if !field.IsZero() {
 			continue
 		}
 		// parse tag
@@ -116,16 +153,6 @@ func default_(v any) any {
 				panic(err)
 			}
 			field.SetInt(j)
-		case reflect.Struct:
-			for _, t := range strings.Split(tag, ";") {
-				if !call(t, field.Addr(), vv.Addr()) {
-					fn := field.Addr().MethodByName(t)
-					if !fn.IsValid() {
-						panic(ErrMethod)
-					}
-					fn.Call([]reflect.Value{vv.Addr()})
-				}
-			}
 		}
 	}
 	return v
@@ -150,7 +177,7 @@ func abs(dst, src any) any {
 	vv := reflect.ValueOf(dst).Elem()
 	vs := reflect.ValueOf(src).Elem()
 
-	g := Graph[string](0)
+	g := make(graph.Graph[string, int])
 	for i, l := 0, vt.NumField(); i < l; i++ {
 		abs := vt.Field(i).Tag.Get("abs")
 		if abs == "" {
@@ -164,33 +191,33 @@ func abs(dst, src any) any {
 				if vi.IsZero() {
 					vi.SetString(vsi.String())
 				}
-				g.Values[i] = vi.String()
+				g.Node(i).Set(vi.String())
 			}
 		} else {
 			field, ok := vt.FieldByName(abs)
 			if !ok {
 				panic(ErrTagAbs)
 			}
-			g.Add(field.Index[0], i)
+			g.Add(field.Index[0], i, 0)
 		}
 	}
 
-	g.BFS(func(from, to int, value string) {
-		vvt := vv.Field(to)
+	g.BFS(func(from, to *graph.Node[string, int], edge *graph.Edge[string, int]) {
+		vvt := vv.Field(to.Index)
 		if vvt.Kind() == reflect.Ptr {
 			vvt = vvt.Elem()
 		}
 		val := vvt.String()
 		if val == "" {
-			vo := vs.Field(to)
+			vo := vs.Field(to.Index)
 			if vo.Kind() == reflect.Ptr {
 				vo = vo.Elem()
 			}
 			val = vo.String()
 		}
-		value = filepath.Join(value, val)
+		value := filepath.Join(from.Get(), val)
 		vvt.SetString(value)
-		g.Values[to] = value
+		to.Set(value)
 	})
 	return dst
 }
