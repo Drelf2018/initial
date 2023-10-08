@@ -82,6 +82,72 @@ func findMethod(field reflect.Value, name string, in []reflect.Value) bool {
 	}
 }
 
+func setValue(field reflect.Value, tag string, in []reflect.Value) {
+	// check field
+	if !field.CanSet() {
+		return
+	}
+	// func
+	switch field.Kind() {
+	case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
+		for _, method := range strings.Split(tag, ";") {
+			if method == "" || call(method, field.Addr(), in[0]) {
+				continue
+			}
+			var prefix, name string
+			s := strings.SplitN(method, ".", 2)
+			if len(s) == 1 {
+				name = s[0]
+			} else {
+				prefix, name = s[0], s[1]
+			}
+			if prefix == "range" {
+				switch field.Kind() {
+				case reflect.Array, reflect.Slice:
+				default:
+					panic(ErrTagRange)
+				}
+				for j, k := 0, field.Len(); j < k; j++ {
+					setValue(field.Index(j), name, in)
+				}
+			} else {
+				if findMethod(field, name, in) {
+					break
+				}
+			}
+		}
+		return
+	}
+	if !field.IsZero() {
+		return
+	}
+	// parse tag
+	switch field.Kind() {
+	case reflect.String:
+		field.SetString(tag)
+	case reflect.Bool:
+		if tag == "true" {
+			field.SetBool(true)
+		} else if tag == "false" {
+			field.SetBool(false)
+		} else {
+			panic(ErrTagType)
+		}
+	case reflect.Float64:
+		f, err := strconv.ParseFloat(tag, 64)
+		if err != nil {
+			panic(err)
+		}
+		field.SetFloat(f)
+	case reflect.Int64:
+		j, err := strconv.ParseInt(tag, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		field.SetInt(j)
+	}
+}
+
 func default_(v any) any {
 	if v == nil {
 		panic(ErrPtrNil)
@@ -110,71 +176,8 @@ func default_(v any) any {
 			}
 			field = field.Elem()
 		}
-		// check field
-		if !field.CanSet() {
-			continue
-		}
-		// func
-		switch field.Kind() {
-		case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
-			for _, method := range strings.Split(tag, ";") {
-				if method == "" || call(method, field.Addr(), vv.Addr()) {
-					continue
-				}
-				var prefix, name string
-				s := strings.Split(method, ".")
-				if len(s) == 1 {
-					name = s[0]
-				} else {
-					prefix, name = s[0], s[1]
-				}
-				if prefix == "range" {
-					switch field.Kind() {
-					case reflect.Array, reflect.Slice:
-					default:
-						panic(ErrTagRange)
-					}
-					for j, k := 0, field.Len(); j < k; j++ {
-						if findMethod(field.Index(j), name, in) {
-							break
-						}
-					}
-				} else {
-					if findMethod(field, name, in) {
-						break
-					}
-				}
-			}
-			continue
-		}
-		if !field.IsZero() {
-			continue
-		}
-		// parse tag
-		switch field.Kind() {
-		case reflect.String:
-			field.SetString(tag)
-		case reflect.Bool:
-			if tag == "true" {
-				field.SetBool(true)
-			} else if tag == "false" {
-				field.SetBool(false)
-			} else {
-				panic(ErrTagType)
-			}
-		case reflect.Float64:
-			f, err := strconv.ParseFloat(tag, 64)
-			if err != nil {
-				panic(err)
-			}
-			field.SetFloat(f)
-		case reflect.Int64:
-			j, err := strconv.ParseInt(tag, 10, 64)
-			if err != nil {
-				panic(err)
-			}
-			field.SetInt(j)
-		}
+		// set value
+		setValue(field, tag, in)
 	}
 	return v
 }

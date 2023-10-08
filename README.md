@@ -15,7 +15,7 @@ import (
 )
 
 type File struct {
-	Name string
+	Name string `default:"initial.go"`
 }
 
 func (f *File) Info(*Path) {
@@ -25,7 +25,7 @@ func (f *File) Info(*Path) {
 type Files []File
 
 func (f *Files) Add(p *Path) {
-	*f = append(*f, File{p.Full.Posts}, File{p.Full.Index})
+	*f = append(*f, File{p.Full.Posts}, File{}, File{p.Full.Index})
 }
 
 type Path struct {
@@ -46,7 +46,7 @@ type Path struct {
 		T4 int64   `default:"114"`
 	} `default:"initial.Default"`
 
-	Files Files `default:"Add;range.Info"`
+	Files Files `default:"Add;range.initial.Default;range.Info"`
 }
 
 func (p *Path) Init(_ any) {
@@ -84,6 +84,7 @@ new: &{ pages       <nil> { false 0 0} []}
 self: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 0} []}
 parent: &{resource views public posts.db users.db .log index.html .version 0xc00001e8f0 { false 0 0} []}
 resource\public\posts.db
+initial.go
 resource\pages\index.html
-result: &{resource views public posts.db users.db .log index.html .version 0xc00001e8f0 {t1 true 3.14 114} [{resource\public\posts.db} {resource\pages\index.html}]}
+result: &{resource views public posts.db users.db .log index.html .version 0xc00001e8f0 {t1 true 3.14 114} [{resource\public\posts.db} {initial.go} {resource\pages\index.html}]}
 ```
