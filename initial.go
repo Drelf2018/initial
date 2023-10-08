@@ -17,6 +17,7 @@ var (
 	ErrTagAbs   = errors.New("tag abs must be a field name")
 	ErrTagType  = errors.New("tag default's type didn't match")
 	ErrTagRange = errors.New("can't range value v")
+	ErrBreak    = errors.New("isn't a real error, just used to break loop")
 )
 
 type fn struct {
@@ -24,7 +25,7 @@ type fn struct {
 	args []string
 }
 
-var functions map[string]fn
+var functions = make(map[string]fn)
 
 func Register(name string, f any, args ...string) {
 	functions[name] = fn{reflect.ValueOf(f), args}
@@ -51,7 +52,6 @@ func call(name string, self, parent reflect.Value) bool {
 }
 
 func init() {
-	functions = make(map[string]fn)
 	Register("-", func() {})
 	Register("initial.Abs", abs, "self", "parent")
 	Register("initial.Default", default_, "self")
@@ -59,6 +59,27 @@ func init() {
 
 func Default[P any, T *P](v T) T {
 	return default_(v).(T)
+}
+
+func findMethod(field reflect.Value, name string, in []reflect.Value) bool {
+	fn := field.Addr().MethodByName(name)
+	if !fn.IsValid() {
+		panic(ErrMethod)
+	}
+	vs := fn.Call(in)
+	if len(vs) == 0 {
+		return false
+	}
+	// return true means break
+	v := vs[0].Interface()
+	switch v := v.(type) {
+	case bool:
+		return v
+	case error:
+		return v != nil
+	default:
+		return false
+	}
 }
 
 func default_(v any) any {
@@ -74,6 +95,7 @@ func default_(v any) any {
 		panic(ErrTypeStr)
 	}
 	vv := reflect.ValueOf(v).Elem()
+	in := []reflect.Value{vv.Addr()}
 	for i, l := 0, vt.NumField(); i < l; i++ {
 		// check tag
 		tag, ok := vt.Field(i).Tag.Lookup("default")
@@ -95,13 +117,6 @@ func default_(v any) any {
 		// func
 		switch field.Kind() {
 		case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
-			findMethod := func(field reflect.Value, name string) {
-				fn := field.Addr().MethodByName(name)
-				if !fn.IsValid() {
-					panic(ErrMethod)
-				}
-				fn.Call([]reflect.Value{vv.Addr()})
-			}
 			for _, method := range strings.Split(tag, ";") {
 				if method == "" || call(method, field.Addr(), vv.Addr()) {
 					continue
@@ -114,14 +129,20 @@ func default_(v any) any {
 					prefix, name = s[0], s[1]
 				}
 				if prefix == "range" {
-					if field.Kind() != reflect.Array && field.Kind() != reflect.Slice {
+					switch field.Kind() {
+					case reflect.Array, reflect.Slice:
+					default:
 						panic(ErrTagRange)
 					}
-					for j, len := 0, field.Len(); j < len; j++ {
-						findMethod(field.Index(j), name)
+					for j, k := 0, field.Len(); j < k; j++ {
+						if findMethod(field.Index(j), name, in) {
+							break
+						}
 					}
 				} else {
-					findMethod(field, name)
+					if findMethod(field, name, in) {
+						break
+					}
 				}
 			}
 			continue

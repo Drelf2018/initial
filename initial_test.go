@@ -30,7 +30,7 @@ type Path struct {
 	Log     string `default:".log" abs:"Root"`
 	Index   string `default:"index.html" abs:"Views"`
 	Version string `default:".version" abs:"Views"`
-	Full    *Path  `default:"Init;new;initial.Abs;Self;Parent"`
+	Full    *Path  `default:"Init;new;initial.Abs;Self;Parent;initial.Default"`
 
 	Test struct {
 		T1 string  `default:"t1"`
@@ -47,16 +47,17 @@ func (p *Path) Init(_ any) {
 }
 
 func (p *Path) Self(_ *Path) {
-	fmt.Printf("p: %v\n", p)
+	fmt.Printf("self: %v\n", p)
 
 }
 
-func (*Path) Parent(parent *Path) {
+func (*Path) Parent(parent *Path) error {
 	fmt.Printf("parent: %v\n", parent)
+	return initial.ErrBreak
 }
 
 func NewPath(self *Path) {
-	fmt.Printf("self: %v\n", self)
+	fmt.Printf("new: %v\n", self)
 }
 
 func init() {
