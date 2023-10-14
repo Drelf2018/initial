@@ -157,7 +157,7 @@ func abs(dst, src any) any {
 	vv := reflect.ValueOf(dst).Elem()
 	vs := reflect.ValueOf(src).Elem()
 
-	g := make(graph.Graph[string, int])
+	g := graph.Make[string, int]()
 	for i, l := 0, vt.NumField(); i < l; i++ {
 		abs := vt.Field(i).Tag.Get("abs")
 		if abs == "" {

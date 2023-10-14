@@ -8,7 +8,7 @@ import (
 )
 
 func TestGraph(t *testing.T) {
-	g := make(graph.Graph[int, int])
+	g := graph.Make[int, int]()
 	g.Add(3, 7, 1)
 	g.Add(3, 6, 2)
 	g.Add(2, 5, 3)
@@ -23,4 +23,6 @@ func TestGraph(t *testing.T) {
 		}
 		fmt.Printf("  from.parent: %v to.parent: %v\n\n", idx, to.Parent.Index)
 	})
+
+	g.Clear()
 }

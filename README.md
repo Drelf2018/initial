@@ -83,10 +83,10 @@ func TestPath(t *testing.T) {
 ```
 new: &{ pages       <nil> { false 0 0 <nil>} []}
 self: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 0 <nil>} []}
-parent: &{resource views public posts.db users.db .log index.html .version 0xc00001ea90 { false 0 0 <nil>} []}
+parent: &{resource views public posts.db users.db .log index.html .version 0xc0000ae1a0 { false 0 0 <nil>} []}
 new: &{        <nil> { false 0 0 <nil>} []}
 resource\public\posts.db
 initial.go
 resource\pages\index.html
-result: &{resource views public posts.db users.db .log index.html .version 0xc00001ea90 {t1 true 3.14 114 0xc00001fc70} [{resource\public\posts.db} {initial.go} {resource\pages\index.html}]}
+result: &{resource views public posts.db users.db .log index.html .version 0xc0000ae1a0 {t1 true 3.14 114 0xc0000af380} [{resource\public\posts.db} {initial.go} {resource\pages\index.html}]}
 ```
