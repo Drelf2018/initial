@@ -33,10 +33,11 @@ type Path struct {
 	Full    *Path  `default:"Init;new;initial.Abs;Self;Parent;initial.Default"`
 
 	Test struct {
-		T1 string  `default:"t1"`
-		T2 bool    `default:"true"`
-		T3 float64 `default:"3.14"`
-		T4 int64   `default:"114"`
+		T1  string  `default:"t1"`
+		T2  bool    `default:"true"`
+		T3  float64 `default:"3.14"`
+		T4  int64   `default:"114"`
+		New *Path   `default:"new"`
 	} `default:"initial.Default"`
 
 	Files Files `default:"Add;range.initial.Default;range.Info"`

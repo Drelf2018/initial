@@ -40,10 +40,11 @@ type Path struct {
 	Full    *Path  `default:"Init;new;initial.Abs;Self;Parent;initial.Default"`
 
 	Test struct {
-		T1 string  `default:"t1"`
-		T2 bool    `default:"true"`
-		T3 float64 `default:"3.14"`
-		T4 int64   `default:"114"`
+		T1  string  `default:"t1"`
+		T2  bool    `default:"true"`
+		T3  float64 `default:"3.14"`
+		T4  int64   `default:"114"`
+		New *Path   `default:"new"`
 	} `default:"initial.Default"`
 
 	Files Files `default:"Add;range.initial.Default;range.Info"`
@@ -80,11 +81,12 @@ func TestPath(t *testing.T) {
 #### 控制台
 
 ```
-new: &{ pages       <nil> { false 0 0} []}
-self: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 0} []}
-parent: &{resource views public posts.db users.db .log index.html .version 0xc00001e8f0 { false 0 0} []}
+new: &{ pages       <nil> { false 0 0 <nil>} []}
+self: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 0 <nil>} []}
+parent: &{resource views public posts.db users.db .log index.html .version 0xc00001ea90 { false 0 0 <nil>} []}
+new: &{        <nil> { false 0 0 <nil>} []}
 resource\public\posts.db
 initial.go
 resource\pages\index.html
-result: &{resource views public posts.db users.db .log index.html .version 0xc00001e8f0 {t1 true 3.14 114} [{resource\public\posts.db} {initial.go} {resource\pages\index.html}]}
+result: &{resource views public posts.db users.db .log index.html .version 0xc00001ea90 {t1 true 3.14 114 0xc00001fc70} [{resource\public\posts.db} {initial.go} {resource\pages\index.html}]}
 ```

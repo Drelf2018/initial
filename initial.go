@@ -4,7 +4,6 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/Drelf2018/initial/graph"
@@ -15,7 +14,6 @@ var (
 	ErrPtrNil   = errors.New("pointer parament is nil")
 	ErrTypeStr  = errors.New("value v must be a pointer to a struct")
 	ErrTagAbs   = errors.New("tag abs must be a field name")
-	ErrTagType  = errors.New("tag default's type didn't match")
 	ErrTagRange = errors.New("can't range value v")
 	ErrBreak    = errors.New("isn't a real error, just used to break loop")
 )
@@ -61,8 +59,8 @@ func Default[P any, T *P](v T) T {
 	return default_(v).(T)
 }
 
-func findMethod(field reflect.Value, name string, in []reflect.Value) bool {
-	fn := field.Addr().MethodByName(name)
+func findMethod(value reflect.Value, name string, in []reflect.Value) bool {
+	fn := value.Addr().MethodByName(name)
 	if !fn.IsValid() {
 		panic(ErrMethod)
 	}
@@ -82,69 +80,33 @@ func findMethod(field reflect.Value, name string, in []reflect.Value) bool {
 	}
 }
 
-func setValue(field reflect.Value, tag string, in []reflect.Value) {
-	// check field
-	if !field.CanSet() {
-		return
+func splitMethod(method string) (prefix, name string) {
+	s := strings.SplitN(method, ".", 2)
+	if len(s) == 1 {
+		return "", s[0]
 	}
-	// func
-	switch field.Kind() {
-	case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
-		for _, method := range strings.Split(tag, ";") {
-			if method == "" || call(method, field.Addr(), in[0]) {
-				continue
+	return s[0], s[1]
+}
+
+func execMethod(v, parent reflect.Value, val value) {
+	for _, method := range val.methods {
+		if method == "" || call(method, v.Addr(), parent) {
+			continue
+		}
+		prefix, name := splitMethod(method)
+		switch prefix {
+		case "range":
+			if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
+				panic(ErrTagRange)
 			}
-			var prefix, name string
-			s := strings.SplitN(method, ".", 2)
-			if len(s) == 1 {
-				name = s[0]
-			} else {
-				prefix, name = s[0], s[1]
+			for j, k := 0, v.Len(); j < k; j++ {
+				execMethod(v.Index(j), parent, value{methods: []string{name}})
 			}
-			if prefix == "range" {
-				switch field.Kind() {
-				case reflect.Array, reflect.Slice:
-				default:
-					panic(ErrTagRange)
-				}
-				for j, k := 0, field.Len(); j < k; j++ {
-					setValue(field.Index(j), name, in)
-				}
-			} else {
-				if findMethod(field, name, in) {
-					break
-				}
+		default:
+			if findMethod(v, name, []reflect.Value{parent}) {
+				return
 			}
 		}
-		return
-	}
-	if !field.IsZero() {
-		return
-	}
-	// parse tag
-	switch field.Kind() {
-	case reflect.String:
-		field.SetString(tag)
-	case reflect.Bool:
-		if tag == "true" {
-			field.SetBool(true)
-		} else if tag == "false" {
-			field.SetBool(false)
-		} else {
-			panic(ErrTagType)
-		}
-	case reflect.Float64:
-		f, err := strconv.ParseFloat(tag, 64)
-		if err != nil {
-			panic(err)
-		}
-		field.SetFloat(f)
-	case reflect.Int64:
-		j, err := strconv.ParseInt(tag, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		field.SetInt(j)
 	}
 }
 
@@ -152,32 +114,26 @@ func default_(v any) any {
 	if v == nil {
 		panic(ErrPtrNil)
 	}
-	vt := reflect.TypeOf(v)
-	if vt.Kind() != reflect.Ptr {
-		panic(ErrTypeStr)
-	}
-	vt = vt.Elem()
-	if vt.Kind() != reflect.Struct {
-		panic(ErrTypeStr)
-	}
 	vv := reflect.ValueOf(v).Elem()
-	in := []reflect.Value{vv.Addr()}
-	for i, l := 0, vt.NumField(); i < l; i++ {
-		// check tag
-		tag, ok := vt.Field(i).Tag.Lookup("default")
-		if !ok {
+	for i, val := range ref.Get(v) {
+		value := vv.Field(i)
+		// create ptr value
+		if value.Kind() == reflect.Ptr {
+			if value.IsNil() {
+				value.Set(reflect.New(value.Type().Elem()))
+			}
+			value = value.Elem()
+		}
+		// ckeck
+		if !value.CanSet() {
 			continue
 		}
-		// get real value
-		field := vv.Field(i)
-		if field.Kind() == reflect.Ptr {
-			if field.IsNil() {
-				field.Set(reflect.New(vt.Field(i).Type.Elem()))
-			}
-			field = field.Elem()
-		}
 		// set value
-		setValue(field, tag, in)
+		if value.IsZero() && val.v.IsValid() {
+			value.Set(val.v)
+			continue
+		}
+		execMethod(value, vv.Addr(), val)
 	}
 	return v
 }
