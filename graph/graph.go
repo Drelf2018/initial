@@ -53,7 +53,7 @@ func (e *Edge[V, E]) Get() E {
 
 type Graph[V, E any] struct {
 	Map  map[int]*Node[V, E]
-	Pool Pool.TypePool[*Edge[V, E]]
+	Pool Pool.Pool[*Edge[V, E]]
 }
 
 func Make[V, E any]() *Graph[V, E] {

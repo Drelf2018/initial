@@ -11,7 +11,8 @@ import (
 
 var (
 	ErrMethod   = errors.New("tag method name not found")
-	ErrPtrNil   = errors.New("pointer parament is nil")
+	ErrNil      = errors.New("pass in value is nil")
+	ErrPtrNil   = errors.New("pass in pointer's value is nil")
 	ErrTypeStr  = errors.New("value v must be a pointer to a struct")
 	ErrTagAbs   = errors.New("tag abs must be a field name")
 	ErrTagRange = errors.New("can't range value v")
@@ -55,8 +56,23 @@ func init() {
 	Register("initial.Default", default_, "self")
 }
 
-func Default[P any, T *P](v T) T {
-	return default_(v).(T)
+type BeforeDefault interface {
+	BeforeDefault()
+}
+
+type AfterDefault interface {
+	AfterDefault()
+}
+
+func Default[T any](v *T) *T {
+	if b, ok := any(v).(BeforeDefault); ok {
+		b.BeforeDefault()
+	}
+	r := default_(v)
+	if a, ok := r.(AfterDefault); ok {
+		a.AfterDefault()
+	}
+	return r.(*T)
 }
 
 func findMethod(value reflect.Value, name string, in []reflect.Value) bool {
@@ -88,8 +104,8 @@ func splitMethod(method string) (prefix, name string) {
 	return s[0], s[1]
 }
 
-func execMethod(v, parent reflect.Value, val value) {
-	for _, method := range val.methods {
+func execMethod(v, parent reflect.Value, methods ...string) {
+	for _, method := range methods {
 		if method == "" || call(method, v.Addr(), parent) {
 			continue
 		}
@@ -100,7 +116,7 @@ func execMethod(v, parent reflect.Value, val value) {
 				panic(ErrTagRange)
 			}
 			for j, k := 0, v.Len(); j < k; j++ {
-				execMethod(v.Index(j), parent, value{methods: []string{name}})
+				execMethod(v.Index(j), parent, name)
 			}
 		default:
 			if findMethod(v, name, []reflect.Value{parent}) {
@@ -112,34 +128,40 @@ func execMethod(v, parent reflect.Value, val value) {
 
 func default_(v any) any {
 	if v == nil {
-		panic(ErrPtrNil)
+		panic(ErrNil)
 	}
 	vv := reflect.ValueOf(v).Elem()
-	for i, val := range ref.Get(v) {
-		value := vv.Field(i)
+	if !vv.IsValid() {
+		panic(ErrPtrNil)
+	}
+	for idx, value := range ref.Get(v) {
+		if !value.IsValid() {
+			continue
+		}
+		vi := vv.Field(idx)
 		// create ptr value
-		if value.Kind() == reflect.Ptr {
-			if value.IsNil() {
-				value.Set(reflect.New(value.Type().Elem()))
+		if vi.Kind() == reflect.Ptr {
+			if vi.IsNil() {
+				vi.Set(reflect.New(vi.Type().Elem()))
 			}
-			value = value.Elem()
+			vi = vi.Elem()
 		}
 		// ckeck
-		if !value.CanSet() {
+		if !vi.CanSet() {
 			continue
 		}
 		// set value
-		if value.IsZero() && val.v.IsValid() {
-			value.Set(val.v)
+		if vi.IsZero() && value.Value.IsValid() {
+			vi.Set(value.Value)
 			continue
 		}
-		execMethod(value, vv.Addr(), val)
+		execMethod(vi, vv.Addr(), value.methods...)
 	}
 	return v
 }
 
-func Abs[P any, T *P](dst, src T) T {
-	return abs(dst, src).(T)
+func Abs[T any](dst, src *T) *T {
+	return abs(dst, src).(*T)
 }
 
 func abs(dst, src any) any {

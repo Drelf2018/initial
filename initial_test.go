@@ -40,6 +40,8 @@ type Path struct {
 		New *Path   `default:"new"`
 	} `default:"initial.Default"`
 
+	Null string
+
 	Files Files `default:"Add;range.initial.Default;range.Info"`
 }
 
@@ -65,7 +67,19 @@ func init() {
 	initial.Register("new", NewPath, "self")
 }
 
+func (p *Path) BeforeDefault() {
+	fmt.Printf("BeforeDefault\n")
+}
+
+func (p *Path) AfterDefault() {
+	fmt.Printf("AfterDefault\n")
+}
+
 func TestPath(t *testing.T) {
 	result := initial.Default(&Path{})
 	fmt.Printf("result: %v\n", result)
+
+	if result.Full.Version != `resource\pages\.version` {
+		t.Fail()
+	}
 }
