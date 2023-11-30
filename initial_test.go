@@ -11,6 +11,14 @@ type File struct {
 	Name string `default:"initial.go"`
 }
 
+func (f *File) BeforeInitial(parent any) {
+	fmt.Printf("BeforeInitial: %v\n", f)
+}
+
+func (f *File) AfterInitial(parent any) {
+	fmt.Printf("AfterInitial: %v\n", f)
+}
+
 func (f *File) Info(*Path) {
 	fmt.Println(f.Name)
 }
@@ -19,6 +27,7 @@ type Files []File
 
 func (f *Files) Add(p *Path) {
 	*f = append(*f, File{p.Full.Posts}, File{}, File{p.Full.Index})
+	p.FileMap = []map[*File]*File{{{"twice"}: {"once"}}}
 }
 
 type Path struct {
@@ -30,19 +39,21 @@ type Path struct {
 	Log     string `default:".log" abs:"Root"`
 	Index   string `default:"index.html" abs:"Views"`
 	Version string `default:".version" abs:"Views"`
-	Full    *Path  `default:"Init;new;initial.Abs;Self;Parent;initial.Default"`
+	Full    *Path  `default:"-,Init,new,initial.Abs,Self,Parent"`
 
 	Test struct {
 		T1  string  `default:"t1"`
 		T2  bool    `default:"true"`
 		T3  float64 `default:"3.14"`
 		T4  int64   `default:"114"`
-		New *Path   `default:"new"`
-	} `default:"initial.Default"`
+		New *Path   `default:"-,new"`
+	}
 
-	Null string
+	Null string `default:""`
 
-	Files Files `default:"Add;range.initial.Default;range.Info"`
+	Files Files `default:"Add,[Info]"`
+
+	FileMap []map[*File]*File `default:"[{Info,Info:Info}]"`
 }
 
 func (p *Path) Init(_ any) {
@@ -64,7 +75,7 @@ func NewPath(self *Path) {
 }
 
 func init() {
-	initial.Register("new", NewPath, "self")
+	initial.Register("new", NewPath, initial.SELF)
 }
 
 func (p *Path) BeforeDefault() {

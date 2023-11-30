@@ -1,16 +1,29 @@
 package initial
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/Drelf2018/TypeGo/Reflect"
+	"github.com/Drelf2018/initial/tag"
 )
 
 type value struct {
 	reflect.Value
-	methods []string
+	methods *tag.Sentence
+}
+
+func (v value) String() string {
+	l := 0
+	s := ""
+	if v.methods != nil {
+		l = len(v.methods.Body)
+	}
+	if l > 1 {
+		s = "s"
+	}
+	return fmt.Sprintf("%v<%d method%s>", v.Value, l, s)
 }
 
 func (v *value) set(i any, err error) {
@@ -24,13 +37,13 @@ func (v *value) IsValid() bool {
 	if v.Value.IsValid() {
 		return true
 	}
-	return len(v.methods) != 0
+	return v.methods != nil
 }
 
 var ref = Reflect.New(func(self *Reflect.Reflect[value], field reflect.StructField, elem reflect.Type) (v value) {
 	self.GetType(field.Type, nil)
-	val, ok := field.Tag.Lookup("default")
-	if !ok {
+	val := field.Tag.Get("default")
+	if val == "-" {
 		return
 	}
 	switch field.Type.Kind() {
@@ -47,7 +60,7 @@ var ref = Reflect.New(func(self *Reflect.Reflect[value], field reflect.StructFie
 	case reflect.Complex64, reflect.Complex128:
 		v.set(strconv.ParseComplex(val, 128))
 	default:
-		v.methods = strings.Split(val, ";")
+		v.methods = tag.NewParser(val).Sentence
 	}
 	return
 })

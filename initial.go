@@ -2,11 +2,9 @@ package initial
 
 import (
 	"errors"
-	"path/filepath"
 	"reflect"
-	"strings"
 
-	"github.com/Drelf2018/initial/graph"
+	"github.com/Drelf2018/initial/tag"
 )
 
 var (
@@ -19,41 +17,58 @@ var (
 	ErrBreak    = errors.New("isn't a real error, just used to break loop")
 )
 
+type Arg int
+
+const (
+	SELF Arg = iota
+	PARENT
+)
+
 type fn struct {
 	fn   reflect.Value
-	args []string
+	args []Arg
 }
 
 var functions = make(map[string]fn)
 
-func Register(name string, f any, args ...string) {
+func Register(name string, f any, args ...Arg) {
 	functions[name] = fn{reflect.ValueOf(f), args}
 }
 
-func call(name string, self, parent reflect.Value) bool {
-	if v, ok := functions[name]; ok {
-		if v.fn.IsZero() {
-			return false
-		}
-		var in []reflect.Value
-		for _, arg := range v.args {
-			switch arg {
-			case "self":
-				in = append(in, self)
-			case "parent":
-				in = append(in, parent)
-			}
-		}
-		v.fn.Call(in)
-		return true
+func needBreak(out []reflect.Value) bool {
+	if len(out) == 0 {
+		return false
 	}
-	return false
+	// return true means break
+	o := out[0].Interface()
+	switch o := o.(type) {
+	case bool:
+		return o
+	case error:
+		return o != nil
+	default:
+		return false
+	}
+}
+
+func call(self, parent reflect.Value, fn fn) bool {
+	if fn.fn.IsZero() {
+		return false
+	}
+	var in []reflect.Value
+	for _, arg := range fn.args {
+		switch arg {
+		case SELF:
+			in = append(in, self)
+		case PARENT:
+			in = append(in, parent)
+		}
+	}
+	return needBreak(fn.fn.Call(in))
 }
 
 func init() {
-	Register("-", func() {})
-	Register("initial.Abs", abs, "self", "parent")
-	Register("initial.Default", default_, "self")
+	Register("initial.Abs", AbsUnsafe, SELF, PARENT)
 }
 
 type BeforeDefault interface {
@@ -68,65 +83,77 @@ func Default[T any](v *T) *T {
 	if b, ok := any(v).(BeforeDefault); ok {
 		b.BeforeDefault()
 	}
-	r := default_(v)
+	r := DefaultUnsafe(v)
 	if a, ok := r.(AfterDefault); ok {
 		a.AfterDefault()
 	}
 	return r.(*T)
 }
 
-func findMethod(value reflect.Value, name string, in []reflect.Value) bool {
-	fn := value.Addr().MethodByName(name)
+func findMethod(v, parent reflect.Value, method string) (bool, error) {
+	var fn reflect.Value
+	if v.CanAddr() {
+		fn = v.Addr().MethodByName(method)
+	} else {
+		fn = v.MethodByName(method)
+	}
 	if !fn.IsValid() {
-		panic(ErrMethod)
+		return true, ErrMethod
 	}
-	vs := fn.Call(in)
-	if len(vs) == 0 {
-		return false
-	}
-	// return true means break
-	v := vs[0].Interface()
-	switch v := v.(type) {
-	case bool:
-		return v
-	case error:
-		return v != nil
-	default:
-		return false
-	}
+	return needBreak(fn.Call([]reflect.Value{parent.Addr()})), nil
 }
 
-func splitMethod(method string) (prefix, name string) {
-	s := strings.SplitN(method, ".", 2)
-	if len(s) == 1 {
-		return "", s[0]
+func execMethod(v, parent reflect.Value, method string) bool {
+	if method == "" {
+		return false
 	}
-	return s[0], s[1]
+	if fn, ok := functions[method]; ok {
+		return call(v.Addr(), parent.Addr(), fn)
+	}
+	b, err := findMethod(v, parent, method)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
-func execMethod(v, parent reflect.Value, methods ...string) {
-	for _, method := range methods {
-		if method == "" || call(method, v.Addr(), parent) {
+func execMethods(v, parent reflect.Value, methods *tag.Sentence) {
+	findMethod(v, parent, "BeforeInitial")
+	defer findMethod(v, parent, "AfterInitial")
+	if len(methods.Body) == 0 || methods.Body[0].Value != "-" {
+		if v.Kind() == reflect.Struct {
+			DefaultUnsafe(v.Addr().Interface())
+		}
+	}
+	for _, method := range methods.Body {
+		if method.Value == "-" {
 			continue
 		}
-		prefix, name := splitMethod(method)
-		switch prefix {
-		case "range":
+		switch method.Kind {
+		case tag.LBRACKET:
 			if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
 				panic(ErrTagRange)
 			}
 			for j, k := 0, v.Len(); j < k; j++ {
-				execMethod(v.Index(j), parent, name)
+				execMethods(v.Index(j), parent, method)
+			}
+		case tag.LBRACE:
+			if v.Kind() != reflect.Map {
+				panic(ErrTagRange)
+			}
+			for _, key := range v.MapKeys() {
+				execMethods(key, parent, method.Body[0])
+				execMethods(v.MapIndex(key), parent, method.Body[1])
 			}
 		default:
-			if findMethod(v, name, []reflect.Value{parent}) {
+			if execMethod(v, parent, method.Value) {
 				return
 			}
 		}
 	}
 }
 
-func default_(v any) any {
+func DefaultUnsafe(v any) any {
 	if v == nil {
 		panic(ErrNil)
 	}
@@ -151,75 +178,13 @@ func default_(v any) any {
 			continue
 		}
 		// set value
-		if vi.IsZero() && value.Value.IsValid() {
-			vi.Set(value.Value)
-			continue
-		}
-		execMethod(vi, vv.Addr(), value.methods...)
-	}
-	return v
-}
-
-func Abs[T any](dst, src *T) *T {
-	return abs(dst, src).(*T)
-}
-
-func abs(dst, src any) any {
-	if dst == nil {
-		panic(ErrPtrNil)
-	}
-	vt := reflect.TypeOf(dst)
-	if vt.Kind() != reflect.Ptr {
-		panic(ErrTypeStr)
-	}
-	vt = vt.Elem()
-	if vt.Kind() != reflect.Struct {
-		panic(ErrTypeStr)
-	}
-	vv := reflect.ValueOf(dst).Elem()
-	vs := reflect.ValueOf(src).Elem()
-
-	g := graph.Make[string, int]()
-	for i, l := 0, vt.NumField(); i < l; i++ {
-		abs := vt.Field(i).Tag.Get("abs")
-		if abs == "" {
-			vi := vv.Field(i)
-			vsi := vs.Field(i)
-			if vi.Kind() == reflect.Ptr {
-				vi = vi.Elem()
-				vsi = vsi.Elem()
-			}
-			if vi.Kind() == reflect.String {
-				if vi.IsZero() {
-					vi.SetString(vsi.String())
-				}
-				g.Node(i).Set(vi.String())
+		if value.Value.IsValid() {
+			if vi.IsZero() {
+				vi.Set(value.Value)
 			}
 		} else {
-			field, ok := vt.FieldByName(abs)
-			if !ok {
-				panic(ErrTagAbs)
-			}
-			g.Add(field.Index[0], i, 0)
+			execMethods(vi, vv, value.methods)
 		}
 	}
-
-	g.BFS(func(from, to *graph.Node[string, int], edge *graph.Edge[string, int]) {
-		vvt := vv.Field(to.Index)
-		if vvt.Kind() == reflect.Ptr {
-			vvt = vvt.Elem()
-		}
-		val := vvt.String()
-		if val == "" {
-			vo := vs.Field(to.Index)
-			if vo.Kind() == reflect.Ptr {
-				vo = vo.Elem()
-			}
-			val = vo.String()
-		}
-		value := filepath.Join(from.Get(), val)
-		vvt.SetString(value)
-		to.Set(value)
-	})
-	return dst
+	return v
 }

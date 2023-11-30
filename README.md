@@ -18,6 +18,14 @@ type File struct {
 	Name string `default:"initial.go"`
 }
 
+func (f *File) BeforeInitial(parent any) {
+	fmt.Printf("BeforeInitial: %v\n", f)
+}
+
+func (f *File) AfterInitial(parent any) {
+	fmt.Printf("AfterInitial: %v\n", f)
+}
+
 func (f *File) Info(*Path) {
 	fmt.Println(f.Name)
 }
@@ -26,6 +34,7 @@ type Files []File
 
 func (f *Files) Add(p *Path) {
 	*f = append(*f, File{p.Full.Posts}, File{}, File{p.Full.Index})
+	p.FileMap = []map[*File]*File{{{"twice"}: {"once"}}}
 }
 
 type Path struct {
@@ -37,17 +46,21 @@ type Path struct {
 	Log     string `default:".log" abs:"Root"`
 	Index   string `default:"index.html" abs:"Views"`
 	Version string `default:".version" abs:"Views"`
-	Full    *Path  `default:"Init;new;initial.Abs;Self;Parent;initial.Default"`
+	Full    *Path  `default:"-,Init,new,initial.Abs,Self,Parent"`
 
 	Test struct {
 		T1  string  `default:"t1"`
 		T2  bool    `default:"true"`
 		T3  float64 `default:"3.14"`
 		T4  int64   `default:"114"`
-		New *Path   `default:"new"`
-	} `default:"initial.Default"`
+		New *Path   `default:"-,new"`
+	}
 
-	Files Files `default:"Add;range.initial.Default;range.Info"`
+	Null string `default:""`
+
+	Files Files `default:"Add,[Info]"`
+
+	FileMap []map[*File]*File `default:"[{Info,Info:Info}]"`
 }
 
 func (p *Path) Init(_ any) {
@@ -69,24 +82,51 @@ func NewPath(self *Path) {
 }
 
 func init() {
-	initial.Register("new", NewPath, "self")
+	initial.Register("new", NewPath, initial.SELF)
+}
+
+func (p *Path) BeforeDefault() {
+	fmt.Printf("BeforeDefault\n")
+}
+
+func (p *Path) AfterDefault() {
+	fmt.Printf("AfterDefault\n")
 }
 
 func TestPath(t *testing.T) {
 	result := initial.Default(&Path{})
 	fmt.Printf("result: %v\n", result)
+
+	if result.Full.Version != `resource\pages\.version` {
+		t.Fail()
+	}
 }
 ```
 
 #### 控制台
 
 ```
-new: &{ pages       <nil> { false 0 0 <nil>} []}
-self: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 0 <nil>} []}
-parent: &{resource views public posts.db users.db .log index.html .version 0xc0000ae1a0 { false 0 0 <nil>} []}
-new: &{        <nil> { false 0 0 <nil>} []}
+BeforeDefault
+new: &{ pages       <nil> { false 0 0 <nil>}  [] []}
+self: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 0 <nil>}  [] []}
+parent: &{resource views public posts.db users.db .log index.html .version 0xc00011c200 { false 0 0 <nil>}  [] []}
+new: &{        <nil> { false 0 0 <nil>}  [] []}
+BeforeInitial: &{resource\public\posts.db}
 resource\public\posts.db
+AfterInitial: &{resource\public\posts.db}
+BeforeInitial: &{}
 initial.go
+AfterInitial: &{initial.go}
+BeforeInitial: &{resource\pages\index.html}
 resource\pages\index.html
-result: &{resource views public posts.db users.db .log index.html .version 0xc0000ae1a0 {t1 true 3.14 114 0xc0000af380} [{resource\public\posts.db} {initial.go} {resource\pages\index.html}]}
+AfterInitial: &{resource\pages\index.html}
+BeforeInitial: &{twice}
+twice
+twice
+AfterInitial: &{twice}
+BeforeInitial: &{once}
+once
+AfterInitial: &{once}
+AfterDefault
+result: &{resource views public posts.db users.db .log index.html .version 0xc00011c200 {t1 true 3.14 114 0xc00011c600}  [{resource\public\posts.db} {initial.go} {resource\pages\index.html}] [map[0xc000022a30:0xc000022a20]]}
 ```
