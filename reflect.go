@@ -41,11 +41,13 @@ func (v *value) IsValid() bool {
 }
 
 var ref = Reflect.New(func(self *Reflect.Reflect[value], field reflect.StructField, elem reflect.Type) (v value) {
-	val := field.Tag.Get("default")
+	val, ok := field.Tag.Lookup("default")
 	if val == "-" {
 		return
 	}
-	self.GetType(field.Type, nil)
+	if !ok && field.Type.Kind() != reflect.Struct {
+		return
+	}
 	switch field.Type.Kind() {
 	case reflect.String:
 		v.set(val, nil)
@@ -60,6 +62,7 @@ var ref = Reflect.New(func(self *Reflect.Reflect[value], field reflect.StructFie
 	case reflect.Complex64, reflect.Complex128:
 		v.set(strconv.ParseComplex(val, 128))
 	default:
+		self.GetType(field.Type, nil)
 		v.methods = tag.NewParser(val).Sentence
 	}
 	return
