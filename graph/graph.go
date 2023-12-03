@@ -31,14 +31,13 @@ type Edge[V, E any] struct {
 	Next  *Edge[V, E]
 }
 
-func (e *Edge[V, E]) New() {}
+func (e *Edge[V, E]) OnNew() {}
 
-func (e *Edge[V, E]) Reset() {
-	var v E
-	e.Value, e.Node, e.Next = v, nil, nil
+func (e *Edge[V, E]) OnPut() {
+	e.Value, e.Node, e.Next = *new(E), nil, nil
 }
 
-func (e *Edge[V, E]) Set(x ...any) {
+func (e *Edge[V, E]) OnGet(x ...any) {
 	e.Value, e.Node, e.Next = x[0].(E), x[1].(*Node[V, E]), x[2].(*Edge[V, E])
 }
 
@@ -53,7 +52,7 @@ func (e *Edge[V, E]) Get() E {
 
 type Graph[V, E any] struct {
 	Map  map[int]*Node[V, E]
-	Pool Pool.Pool[*Edge[V, E]]
+	Pool *Pool.Pool[Edge[V, E], *Edge[V, E]]
 }
 
 func Make[V, E any]() *Graph[V, E] {
@@ -106,6 +105,7 @@ func (g *Graph[V, E]) Delete(node *Node[V, E]) {
 	for edge := node.Edge; edge != nil; edge = edge.Next {
 		defer g.Pool.Put(edge)
 	}
+
 	delete(g.Map, node.Index)
 }
 

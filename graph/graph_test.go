@@ -25,4 +25,5 @@ func TestGraph(t *testing.T) {
 	})
 
 	g.Clear()
+	fmt.Printf("g.Pool.Len(): %v\n", g.Pool.Cap())
 }

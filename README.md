@@ -53,7 +53,7 @@ type Path struct {
 		T2  bool    `default:"true"`
 		T3  float64 `default:"3.14"`
 		T4  int64   `default:"114"`
-		New *Path   `default:"-,new"`
+		New *Path   `default:"-"`
 	}
 
 	Null string `default:""`
@@ -109,8 +109,7 @@ func TestPath(t *testing.T) {
 BeforeDefault
 new: &{ pages       <nil> { false 0 0 <nil>}  [] []}
 self: &{resource resource\pages resource\public resource\public\posts.db resource\users.db resource\.log resource\pages\index.html resource\pages\.version <nil> { false 0 0 <nil>}  [] []}
-parent: &{resource views public posts.db users.db .log index.html .version 0xc00011c200 { false 0 0 <nil>}  [] []}
-new: &{        <nil> { false 0 0 <nil>}  [] []}
+parent: &{resource views public posts.db users.db .log index.html .version 0xc000216100 { false 0 0 <nil>}  [] []}
 BeforeInitial: &{resource\public\posts.db}
 resource\public\posts.db
 AfterInitial: &{resource\public\posts.db}
@@ -128,5 +127,5 @@ BeforeInitial: &{once}
 once
 AfterInitial: &{once}
 AfterDefault
-result: &{resource views public posts.db users.db .log index.html .version 0xc00011c200 {t1 true 3.14 114 0xc00011c600}  [{resource\public\posts.db} {initial.go} {resource\pages\index.html}] [map[0xc000022a30:0xc000022a20]]}
+result: &{resource views public posts.db users.db .log index.html .version 0xc000216100 {t1 true 3.14 114 <nil>}  [{resource\public\posts.db} {initial.go} {resource\pages\index.html}] [map[0xc00020e660:0xc00020e650]]}
 ```

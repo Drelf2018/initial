@@ -17,60 +17,6 @@ var (
 	ErrBreak    = errors.New("isn't a real error, just used to break loop")
 )
 
-type Arg int
-
-const (
-	SELF Arg = iota
-	PARENT
-)
-
-type fn struct {
-	fn   reflect.Value
-	args []Arg
-}
-
-var functions = make(map[string]fn)
-
-func Register(name string, f any, args ...Arg) {
-	functions[name] = fn{reflect.ValueOf(f), args}
-}
-
-func needBreak(out []reflect.Value) bool {
-	if len(out) == 0 {
-		return false
-	}
-	// return true means break
-	o := out[0].Interface()
-	switch o := o.(type) {
-	case bool:
-		return o
-	case error:
-		return o != nil
-	default:
-		return false
-	}
-}
-
-func call(self, parent reflect.Value, fn fn) bool {
-	if fn.fn.IsZero() {
-		return false
-	}
-	var in []reflect.Value
-	for _, arg := range fn.args {
-		switch arg {
-		case SELF:
-			in = append(in, self)
-		case PARENT:
-			in = append(in, parent)
-		}
-	}
-	return needBreak(fn.fn.Call(in))
-}
-
-func init() {
-	Register("initial.Abs", AbsUnsafe, SELF, PARENT)
-}
-
 type BeforeDefault interface {
 	BeforeDefault()
 }
@@ -88,69 +34,6 @@ func Default[T any](v *T) *T {
 		a.AfterDefault()
 	}
 	return r.(*T)
-}
-
-func findMethod(v, parent reflect.Value, method string) (bool, error) {
-	var fn reflect.Value
-	if v.CanAddr() {
-		fn = v.Addr().MethodByName(method)
-	} else {
-		fn = v.MethodByName(method)
-	}
-	if !fn.IsValid() {
-		return true, ErrMethod
-	}
-	return needBreak(fn.Call([]reflect.Value{parent.Addr()})), nil
-}
-
-func execMethod(v, parent reflect.Value, method string) bool {
-	if method == "" {
-		return false
-	}
-	if fn, ok := functions[method]; ok {
-		return call(v.Addr(), parent.Addr(), fn)
-	}
-	b, err := findMethod(v, parent, method)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
-func execMethods(v, parent reflect.Value, methods *tag.Sentence) {
-	findMethod(v, parent, "BeforeInitial")
-	defer findMethod(v, parent, "AfterInitial")
-	if len(methods.Body) == 0 || methods.Body[0].Value != "-" {
-		if v.Kind() == reflect.Struct {
-			DefaultUnsafe(v.Addr().Interface())
-		}
-	}
-	for _, method := range methods.Body {
-		if method.Value == "-" {
-			continue
-		}
-		switch method.Kind {
-		case tag.LBRACKET:
-			if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
-				panic(ErrTagRange)
-			}
-			for j, k := 0, v.Len(); j < k; j++ {
-				execMethods(v.Index(j), parent, method)
-			}
-		case tag.LBRACE:
-			if v.Kind() != reflect.Map {
-				panic(ErrTagRange)
-			}
-			for _, key := range v.MapKeys() {
-				execMethods(key, parent, method.Body[0])
-				execMethods(v.MapIndex(key), parent, method.Body[1])
-			}
-		default:
-			if execMethod(v, parent, method.Value) {
-				return
-			}
-		}
-	}
 }
 
 func DefaultUnsafe(v any) any {
@@ -173,13 +56,9 @@ func DefaultUnsafe(v any) any {
 			}
 			vi = vi.Elem()
 		}
-		// ckeck
-		if !vi.CanSet() {
-			continue
-		}
 		// set value
 		if value.Value.IsValid() {
-			if vi.IsZero() {
+			if vi.CanSet() && vi.IsZero() {
 				vi.Set(value.Value)
 			}
 		} else {
@@ -187,4 +66,57 @@ func DefaultUnsafe(v any) any {
 		}
 	}
 	return v
+}
+
+func execMethods(v, parent reflect.Value, methods *tag.Sentence) {
+	CallMethod(v, "BeforeInitial", parent.Addr())
+	defer CallMethod(v, "AfterInitial", parent.Addr())
+
+	if len(methods.Body) == 0 || methods.Body[0].Value != "-" {
+		if v.Kind() == reflect.Struct {
+			DefaultUnsafe(v.Addr().Interface())
+		}
+	}
+
+	for _, method := range methods.Body {
+		if method.Value == "-" {
+			continue
+		}
+		switch method.Kind {
+		case tag.LBRACKET:
+			if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
+				panic(ErrTagRange)
+			}
+			for j, k := 0, v.Len(); j < k; j++ {
+				execMethods(v.Index(j), parent, method)
+			}
+		case tag.LBRACE:
+			if v.Kind() != reflect.Map {
+				panic(ErrTagRange)
+			}
+			iter := v.MapRange()
+			for iter.Next() {
+				execMethods(iter.Key(), parent, method.Body[0])
+				execMethods(iter.Value(), parent, method.Body[1])
+			}
+		default:
+			if execMethod(v, parent, method.Value) {
+				return
+			}
+		}
+	}
+}
+
+func execMethod(v, parent reflect.Value, method string) bool {
+	if method == "" {
+		return false
+	}
+	if fn, ok := functions[method]; ok {
+		return fn.CallWithArgs(v.Addr(), parent.Addr())
+	}
+	fn, ok := FindMethod(v, method)
+	if !ok {
+		panic(ErrMethod)
+	}
+	return fn.Call(parent.Addr())
 }

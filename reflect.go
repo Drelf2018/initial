@@ -41,11 +41,11 @@ func (v *value) IsValid() bool {
 }
 
 var ref = Reflect.New(func(self *Reflect.Reflect[value], field reflect.StructField, elem reflect.Type) (v value) {
-	self.GetType(field.Type, nil)
 	val := field.Tag.Get("default")
 	if val == "-" {
 		return
 	}
+	self.GetType(field.Type, nil)
 	switch field.Type.Kind() {
 	case reflect.String:
 		v.set(val, nil)

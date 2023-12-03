@@ -46,7 +46,7 @@ type Path struct {
 		T2  bool    `default:"true"`
 		T3  float64 `default:"3.14"`
 		T4  int64   `default:"114"`
-		New *Path   `default:"-,new"`
+		New *Path   `default:"-"`
 	}
 
 	Null string `default:""`

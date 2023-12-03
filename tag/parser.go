@@ -8,7 +8,7 @@ type Parser struct {
 	Sentence *Sentence
 }
 
-func (p *Parser) build() {
+func (p *Parser) Build() {
 	sentence := p.Sentence
 	for p.Lexer.Next() {
 		token := p.Lexer.Read()
@@ -46,6 +46,6 @@ func NewParser(s string) (p Parser) {
 		Lexer:    NewLexer(s),
 		Sentence: NewRoot(),
 	}
-	p.build()
+	p.Build()
 	return
 }
