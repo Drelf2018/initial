@@ -31,6 +31,8 @@ func (f *Files) Add(p *Path) {
 }
 
 type Path struct {
+	ID uint16 `default:"9000"`
+
 	Root    string `default:"resource"`
 	Views   string `default:"views" abs:"Root"`
 	Public  string `default:"public" abs:"Root"`

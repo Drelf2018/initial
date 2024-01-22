@@ -2,4 +2,4 @@ module github.com/Drelf2018/initial
 
 go 1.18
 
-require github.com/Drelf2018/TypeGo v0.6.0
+require github.com/Drelf2018/TypeGo v0.7.3
