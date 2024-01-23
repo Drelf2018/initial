@@ -34,7 +34,7 @@ func (v *value) IsValid() bool {
 }
 
 func (v *value) zero(typ reflect.Type, x any) {
-	v.Value = Zero(typ)
+	v.Value = Reflect.Zero(typ)
 	switch i := x.(type) {
 	case int64:
 		v.SetInt(i)
@@ -45,12 +45,6 @@ func (v *value) zero(typ reflect.Type, x any) {
 	case complex128:
 		v.SetComplex(i)
 	}
-}
-
-// Zero returns a Value representing the zero value for the specified type.
-// The result is addressable and settable.
-func Zero(typ reflect.Type) reflect.Value {
-	return reflect.New(typ).Elem()
 }
 
 func parseAny[T any](x T, err error) T {
