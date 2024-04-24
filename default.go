@@ -80,30 +80,36 @@ func DefaultValue(v reflect.Value) (err error) {
 		return ErrInvalidValue
 	}
 
-	if vb, ok := v.Interface().(BeforeDefault); ok {
+	var i any
+	if v.Kind() != reflect.Pointer && v.CanAddr() {
+		i = v.Addr().Interface()
+	} else {
+		i = v.Interface()
+	}
+
+	if vb, ok := i.(BeforeDefault); ok {
 		err = vb.BeforeDefault()
 		if err != nil {
 			return
 		}
 	}
 
-	elem := reflect.Indirect(v)
-
-	switch elem.Kind() {
+	v = reflect.Indirect(v)
+	switch v.Kind() {
 	case reflect.Struct:
-		err = DefaultStruct(elem)
+		err = DefaultStruct(v)
 		if err != nil {
 			return
 		}
 	case reflect.Array, reflect.Slice:
-		for i := 0; i < elem.Len(); i++ {
-			err = DefaultValue(elem.Index(i))
+		for i := 0; i < v.Len(); i++ {
+			err = DefaultValue(v.Index(i))
 			if err != nil {
 				return
 			}
 		}
 	case reflect.Map:
-		iter := elem.MapRange()
+		iter := v.MapRange()
 		for iter.Next() {
 			k := iter.Key()
 			v := iter.Value()
@@ -118,7 +124,7 @@ func DefaultValue(v reflect.Value) (err error) {
 		}
 	}
 
-	if va, ok := v.Interface().(AfterDefault); ok {
+	if va, ok := i.(AfterDefault); ok {
 		err = va.AfterDefault()
 	}
 	return

@@ -87,8 +87,11 @@ func TestPath(t *testing.T) {
 
 ```
 === RUN   TestPath
+BeforeInitial: default.go
 AfterInitial:  default.go
+BeforeInitial:
 AfterInitial:  initial.go
+BeforeInitial: resource\public\posts.db
 AfterInitial:  resource\public\posts.db
 BeforeInitial: key
 AfterInitial:  key
