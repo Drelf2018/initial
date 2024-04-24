@@ -1,10 +1,3 @@
-# initial
-
-依赖注入初始化
-
-### 使用
-
-```golang
 package initial_test
 
 import (
@@ -81,20 +74,3 @@ func TestPath(t *testing.T) {
 		t.Fail()
 	}
 }
-```
-
-#### 控制台
-
-```
-=== RUN   TestPath
-AfterInitial:  default.go
-AfterInitial:  initial.go
-AfterInitial:  resource\public\posts.db
-BeforeInitial: key
-AfterInitial:  key
-BeforeInitial: value
-AfterInitial:  value
---- PASS: TestPath (0.00s)
-PASS
-ok      github.com/Drelf2018/initial    0.014s
-```
