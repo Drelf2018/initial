@@ -1,10 +1,3 @@
-# initial
-
-依赖注入初始化
-
-### 使用
-
-```go
 package initial_test
 
 import (
@@ -76,39 +69,14 @@ func (p *Path) BeforeFull() {
 func (p *Path) BeforeInitial() {
 	p.Files = append(p.Files, File{"default.go"})
 }
-```
 
-#### 测试解析结果
-
-```go
 func TestParse(t *testing.T) {
 	values := initial.ParseValues(reflect.TypeOf(Path{}))
 	for _, val := range values {
 		t.Log(val)
 	}
 }
-```
 
-```
-initial_test.go:76: {0 true <uint16 Value> <invalid Value> <invalid Value>}
-initial_test.go:76: {1 true resource <invalid Value> <invalid Value>}
-initial_test.go:76: {2 true views <invalid Value> <invalid Value>}
-initial_test.go:76: {3 true public <invalid Value> <invalid Value>}
-initial_test.go:76: {4 true posts.db <invalid Value> <invalid Value>}
-initial_test.go:76: {5 true users.db <invalid Value> <invalid Value>}
-initial_test.go:76: {6 true .log <invalid Value> <invalid Value>}
-initial_test.go:76: {7 true index.html <invalid Value> <invalid Value>}
-initial_test.go:76: {8 true .version <invalid Value> <invalid Value>}
-initial_test.go:76: {9 false <invalid Value> <func(*initial_test.Path) Value> <invalid Value>}
-initial_test.go:76: {10 true <invalid Value> <invalid Value> <invalid Value>}
-initial_test.go:76: {11 true <invalid Value> <func(*initial_test.Path) Value> <invalid Value>}
-initial_test.go:76: {12 true <invalid Value> <invalid Value> <invalid Value>}
-initial_test.go:76: {13 true <*errors.errorString Value> <invalid Value> <invalid Value>}
-```
-
-#### 测试初始化
-
-```go
 func TestInitial(t *testing.T) {
 	result, err := initial.New[Path]()
 	if err != nil {
@@ -116,25 +84,7 @@ func TestInitial(t *testing.T) {
 	}
 	t.Log(result)
 }
-```
 
-```
-FileBeforeInitial: default.go
-FileAfterInitial:  default.go
-FileBeforeInitial:
-FileAfterInitial:  initial.go
-FileBeforeInitial: posts.db
-FileAfterInitial:  posts.db
-FileBeforeInitial: key.txt
-FileAfterInitial:  key.txt
-FileBeforeInitial: value.txt
-FileAfterInitial:  value.txt
-    initial_test.go:85: &{9000 resource views public posts.db users.db .log index.html .version 0xc000170200 {d1 true 3.14 114} [{default.go} {initial.go} {posts.db}] [map[0xc00010e800:0xc00010e7f0]] some error}
-```
-
-#### 测试运行时返回错误
-
-```go
 func TestError(t *testing.T) {
 	err := initial.Initial(&Path{Files: []File{{"error.log"}}})
 	if err == nil {
@@ -142,9 +92,3 @@ func TestError(t *testing.T) {
 	}
 	t.Log(err)
 }
-```
-
-```
-FileBeforeInitial: error.log
-    initial_test.go:93: test error
-```

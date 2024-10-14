@@ -2,84 +2,32 @@ package initial
 
 import (
 	"reflect"
-	"strconv"
-
-	"github.com/Drelf2018/reflectMap"
+	"strings"
 )
 
-func Indirect(t reflect.Type) reflect.Type {
-	if t.Kind() != reflect.Pointer {
-		return t
-	}
-	return t.Elem()
+type Value struct {
+	Index   int
+	Initial bool
+	Default reflect.Value
+	Before  reflect.Value
+	After   reflect.Value
 }
 
-func IsOrdinaryValue(fieldType reflect.Type) bool {
-	switch fieldType.Kind() {
-	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.String:
-		return true
-	default:
-		return false
+func ParseValues(parent reflect.Type) (values []Value) {
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
 	}
-}
-
-// ParseOrdinaryValue convert val to reflect.Value with type fieldType.
-//
-// If the usual Go conversion rules do not allow this conversion, ParseOrdinaryValue panics.
-func ParseOrdinaryValue(fieldType reflect.Type, val string) reflect.Value {
-	if val == "" {
-		return reflect.Value{}
+	if parent.Kind() != reflect.Struct {
+		return nil
 	}
 
 	var (
-		x   any
-		err error
+		parentPtrType  = reflect.PointerTo(parent)
+		parentPtrValue = reflect.New(parent)
 	)
 
-	kind := fieldType.Kind()
-	switch kind {
-	case reflect.String:
-		x = val
-	case reflect.Bool:
-		x, err = strconv.ParseBool(val)
-	case reflect.Int:
-		x, err = strconv.ParseInt(val, 10, 0)
-	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		x, err = strconv.ParseInt(val, 10, 1<<kind)
-	case reflect.Uint:
-		x, err = strconv.ParseUint(val, 10, 0)
-	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		x, err = strconv.ParseUint(val, 10, 1<<(kind-5))
-	case reflect.Float32, reflect.Float64:
-		x, err = strconv.ParseFloat(val, 1<<(kind-8))
-	case reflect.Complex64, reflect.Complex128:
-		x, err = strconv.ParseComplex(val, 1<<(kind-9))
-	}
-
-	if err != nil {
-		panic(err)
-	}
-	return reflect.ValueOf(x).Convert(fieldType)
-}
-
-type Value struct {
-	reflect.Value
-	Index   int
-	Before  *Method
-	Initial bool
-	After   *Method
-}
-
-var defaultValues map[string]reflect.Value
-
-func SetDefaultValue(name string, value any) {
-	defaultValues[name] = reflect.ValueOf(value)
-}
-
-var valuesMap = reflectMap.New(func(m *reflectMap.Map[[]Value], elem reflect.Type) (values []Value) {
-	parent := elem.Name()
-
-	for idx, field := range reflectMap.FieldsOf(elem) {
+	for idx := 0; idx < parent.NumField(); idx++ {
+		field := parent.Field(idx)
 		if !field.IsExported() {
 			continue
 		}
@@ -87,41 +35,34 @@ var valuesMap = reflectMap.New(func(m *reflectMap.Map[[]Value], elem reflect.Typ
 		var (
 			defaultTag = field.Tag.Get("default")
 			initialTag = field.Tag.Get("initial")
-
-			fieldElem = Indirect(field.Type)
-			fieldPtr  = reflect.PointerTo(fieldElem)
+			fieldElem  = Indirect(field.Type)
+			value      = Value{Index: idx, Initial: initialTag != "-" && !(field.Type.Kind() == reflect.Pointer && IsRecursiveType(field.Type))}
 		)
 
-		if initialTag != "-" {
-			if initialTag == "" {
-				initialTag = parent + field.Name
+		if strings.HasPrefix(defaultTag, "$") {
+			value.Default = defaultValues[defaultTag]
+		} else if IsOrdinaryValue(fieldElem) {
+			value.Default, _ = ParseOrdinaryValue(fieldElem, defaultTag)
+		}
+
+		if initialTag == "" {
+			initialTag = field.Name
+		}
+		before, ok := parentPtrType.MethodByName("Before" + initialTag)
+		if ok {
+			switch parentPtrValue.Method(before.Index).Interface().(type) {
+			case func(), func() error:
+				value.Before = before.Func
 			}
 		}
-
-		value := Value{
-			Index:   idx,
-			Before:  NewMethod(fieldPtr.MethodByName("Before" + initialTag)),
-			Initial: initialTag != "-",
-			After:   NewMethod(fieldPtr.MethodByName("After" + initialTag)),
+		after, ok := parentPtrType.MethodByName("After" + initialTag)
+		if ok {
+			switch parentPtrValue.Method(after.Index).Interface().(type) {
+			case func(), func() error:
+				value.After = after.Func
+			}
 		}
-
-		if IsOrdinaryValue(fieldElem) {
-			value.Value = ParseOrdinaryValue(fieldElem, defaultTag)
-		} else if defaultTag != "" {
-			value.Value = defaultValues[defaultTag]
-		}
-
-		if value.Initial || value.Value.IsValid() {
-			values = append(values, value)
-		}
+		values = append(values, value)
 	}
 	return
-})
-
-func Get(in any) []Value {
-	return valuesMap.Get(in)
-}
-
-func GetType(in reflect.Type) (values []Value, ok bool) {
-	return valuesMap.GetType(in)
 }
